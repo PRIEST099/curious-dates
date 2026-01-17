@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {
@@ -41,12 +42,21 @@
       ::-webkit-scrollbar-track {
         background: #f1f1f1; 
       }
+      .dark ::-webkit-scrollbar-track {
+        background: #1f2937;
+      }
       ::-webkit-scrollbar-thumb {
         background: #ccc; 
         border-radius: 4px;
       }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #4b5563;
+      }
       ::-webkit-scrollbar-thumb:hover {
         background: #999; 
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #6b7280;
       }
       @keyframes fade-in {
         from { opacity: 0; transform: translateY(10px); }
@@ -54,6 +64,12 @@
       }
       .animate-fade-in {
         animation: fade-in 0.3s ease-out forwards;
+      }
+      
+      /* Base Dark Mode Styles */
+      html.dark body {
+        background-color: #030712; /* gray-950 */
+        color: #f3f4f6; /* gray-100 */
       }
     </style>
   <script type="importmap">

@@ -6,9 +6,15 @@ import { TimelineView } from './components/TimelineView';
 import { DebateModal } from './components/DebateModal';
 import { WhatIfExplorer } from './components/WhatIfExplorer';
 import { ChatSidebar } from './components/ChatSidebar';
-import { MessageCircle } from 'lucide-react';
+import { AdminPanel } from './components/AdminPanel';
+import { ThemeToggle } from './components/ThemeToggle';
+import { LandingPage } from './components/LandingPage';
+import { MessageCircle, Shield } from 'lucide-react';
 
 const App: React.FC = () => {
+  // Navigation State
+  const [showLanding, setShowLanding] = useState(true);
+
   // Application State
   const [timelines, setTimelines] = useState<Timeline[]>(INITIAL_TIMELINES);
   const [currentTimeline, setCurrentTimeline] = useState<Timeline | null>(null);
@@ -18,12 +24,17 @@ const App: React.FC = () => {
   const [isDebateOpen, setIsDebateOpen] = useState(false);
   const [debateEvent, setDebateEvent] = useState<TimelineEvent | null>(null);
   const [isWhatIfOpen, setIsWhatIfOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   
   // Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInitialQuestion, setChatInitialQuestion] = useState<string | undefined>(undefined);
 
   // Handlers
+  const handleStartApp = () => {
+    setShowLanding(false);
+  };
+
   const handleSelectTimeline = (timeline: Timeline) => {
     setCurrentTimeline(timeline);
     setSelectedEventId(null);
@@ -69,9 +80,32 @@ const App: React.FC = () => {
     return "Topic Selection";
   };
 
+  // Render Landing Page
+  if (showLanding) {
+    return (
+      <>
+        <ThemeToggle />
+        <LandingPage onStart={handleStartApp} />
+        {/* Admin Access Button (Bottom Left) - accessible from landing page too */}
+        <button
+          onClick={() => setIsAdminOpen(true)}
+          className="fixed bottom-6 left-6 z-40 bg-gray-800 dark:bg-gray-900 hover:bg-gray-900 dark:hover:bg-black text-white p-3 rounded-full shadow-lg transition-transform hover:scale-110 flex items-center justify-center opacity-50 hover:opacity-100 border border-gray-700"
+          aria-label="Admin Panel"
+        >
+          <Shield size={20} />
+        </button>
+        {isAdminOpen && <AdminPanel onClose={() => setIsAdminOpen(false)} />}
+      </>
+    );
+  }
+
+  // Render Main App
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className="min-h-screen bg-history-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 font-sans transition-colors duration-300">
       
+      {/* Theme Toggle */}
+      <ThemeToggle />
+
       {/* Main Content Area */}
       <main className="h-full">
         {currentTimeline ? (
@@ -93,6 +127,15 @@ const App: React.FC = () => {
         )}
       </main>
 
+      {/* Admin Access Button (Bottom Left) */}
+      <button
+        onClick={() => setIsAdminOpen(true)}
+        className="fixed bottom-6 left-6 z-40 bg-gray-800 dark:bg-gray-900 hover:bg-gray-900 dark:hover:bg-black text-white p-3 rounded-full shadow-lg transition-transform hover:scale-110 flex items-center justify-center opacity-50 hover:opacity-100 border border-gray-700"
+        aria-label="Admin Panel"
+      >
+        <Shield size={20} />
+      </button>
+
       {/* Floating Chat Toggle (Always visible) */}
       <button
         onClick={() => setIsChatOpen(true)}
@@ -100,7 +143,7 @@ const App: React.FC = () => {
         aria-label="Open AI Assistant"
       >
         <MessageCircle size={28} />
-        <span className="absolute right-full mr-4 bg-gray-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+        <span className="absolute right-full mr-4 bg-gray-900 dark:bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
           Ask History AI
         </span>
       </button>
@@ -119,6 +162,10 @@ const App: React.FC = () => {
           onClose={() => setIsDebateOpen(false)}
           onAskQuestion={handleAskQuestionFromDebate}
         />
+      )}
+
+      {isAdminOpen && (
+        <AdminPanel onClose={() => setIsAdminOpen(false)} />
       )}
 
       <ChatSidebar 

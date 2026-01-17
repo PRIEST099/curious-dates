@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, Schema } from '@google/genai';
 import { Timeline, DebateData, ChatMessage } from '../types';
+import { adminService } from './adminService';
 
 const apiKey = process.env.API_KEY || '';
 // Initialize the client. We assume API_KEY is available.
@@ -12,29 +13,37 @@ const cleanJson = (text: string) => {
 
 const generateEventImage = async (description: string, isAlternate: boolean): Promise<string | undefined> => {
   try {
+    adminService.checkSystemAvailability(); // Check Admin Pause
+
     const promptPrefix = isAlternate 
       ? "Cinematic digital art, historical style, showing an alternate history scene: " 
       : "Historical illustration, realistic oil painting style, showing: ";
 
+    const model = 'gemini-2.5-flash-image';
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: model,
       contents: {
         parts: [{ text: promptPrefix + description }]
       }
     });
+
+    adminService.trackUsage(model, 'Generate Image'); // Track Usage
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
         return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message.includes('SYSTEM_PAUSED')) throw error;
     console.warn("Failed to generate image for event:", error);
   }
   return undefined;
 };
 
 export const generateAlternateTimeline = async (prompt: string, type: 'historical' | 'alternate'): Promise<Timeline | null> => {
+  adminService.checkSystemAvailability(); // Check Admin Pause
+  
   const modelId = 'gemini-3-flash-preview'; 
 
   const schema: Schema = {
@@ -78,6 +87,8 @@ export const generateAlternateTimeline = async (prompt: string, type: 'historica
       }
     });
 
+    adminService.trackUsage(modelId, 'Generate Timeline (Text)'); // Track Usage
+
     const text = response.text;
     if (!text) return null;
 
@@ -94,7 +105,9 @@ export const generateAlternateTimeline = async (prompt: string, type: 'historica
       return null;
     }
 
-    // 2. Generate Images in Parallel (Limit to first 4 to save time/resources, or all if feasible)
+    // 2. Generate Images in Parallel
+    // Note: generateEventImage inside here also calls checkSystemAvailability, 
+    // but since we await Promise.all, we should be fine.
     const eventsWithImages = await Promise.all(data.events.map(async (e: any, idx: number) => {
       // Generate image for the event
       const generatedImage = await generateEventImage(e.description, type === 'alternate');
@@ -119,11 +132,13 @@ export const generateAlternateTimeline = async (prompt: string, type: 'historica
     };
   } catch (error) {
     console.error("Error generating timeline:", error);
-    return null;
+    throw error; // Re-throw so UI handles the pause error
   }
 };
 
 export const generateDebate = async (eventTitle: string, eventDescription: string): Promise<DebateData | null> => {
+  adminService.checkSystemAvailability(); // Check Admin Pause
+  
   const modelId = 'gemini-3-pro-preview'; 
 
   const schema: Schema = {
@@ -177,6 +192,8 @@ export const generateDebate = async (eventTitle: string, eventDescription: strin
       }
     });
 
+    adminService.trackUsage(modelId, 'Generate Debate'); // Track Usage
+
     const text = response.text;
     if (!text) return null;
 
@@ -196,7 +213,7 @@ export const generateDebate = async (eventTitle: string, eventDescription: strin
     return data as DebateData;
   } catch (error) {
     console.error("Error generating debate:", error);
-    return null;
+    throw error;
   }
 };
 
@@ -205,9 +222,11 @@ export const askEventSpecificQuestion = async (
   eventDescription: string,
   question: string
 ): Promise<string> => {
-  const modelId = 'gemini-3-flash-preview';
-  
   try {
+    adminService.checkSystemAvailability(); // Check Admin Pause
+    
+    const modelId = 'gemini-3-flash-preview';
+    
     const response = await ai.models.generateContent({
       model: modelId,
       contents: `Context Event: ${eventTitle}
@@ -217,9 +236,12 @@ export const askEventSpecificQuestion = async (
       
       Answer the user's question directly and concisely based on the event context provided above.`,
     });
+
+    adminService.trackUsage(modelId, 'Ask Question (Event)'); // Track Usage
     
     return response.text || "I couldn't find an answer to that specific question.";
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message.includes('SYSTEM_PAUSED')) return "System is currently paused by admin.";
     console.error("Error answering specific question:", error);
     return "I'm having trouble analyzing this event right now.";
   }
@@ -230,9 +252,11 @@ export const generateChatResponse = async (
   currentContext: string,
   userMessage: string
 ): Promise<string> => {
-  const modelId = 'gemini-3-flash-preview';
-
   try {
+    adminService.checkSystemAvailability(); // Check Admin Pause
+    
+    const modelId = 'gemini-3-flash-preview';
+
     const chat = ai.chats.create({
       model: modelId,
       config: {
@@ -248,8 +272,12 @@ export const generateChatResponse = async (
     });
 
     const result = await chat.sendMessage({ message: userMessage });
+    
+    adminService.trackUsage(modelId, 'Chat'); // Track Usage
+    
     return result.text || "I apologize, I couldn't formulate a response at this time.";
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message.includes('SYSTEM_PAUSED')) return "System is currently paused by admin.";
     console.error("Error generating chat response:", error);
     return "I'm having trouble connecting to the history archives right now. Please try again.";
   }
